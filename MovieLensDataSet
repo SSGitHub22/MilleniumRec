@@ -56,3 +56,157 @@ rm(dl, ratings, movies, test_index, temp, movielens, removed)
 head(edx)
 rw <- nrows(edx)
 rw
+
+# Add rows removed from validation set back into edx set
+removed <- anti_join(temp, validation)
+edx <- rbind(edx, removed)
+
+rm(dl, ratings, movies, test_index, temp, movielens, removed)
+head(edx) %>%  kable(caption = "Top rows of edx file") %>%
+kable_styling(font_size = 10, position = "center", latex_options = c("scale_down", "HOLD_position"))
+
+#create summary table
+edx_summary <- data.frame(number_of_rows = nrow(edx), number_of_column = ncol(edx), number_of_users = n_distinct(edx$userId), number_of_movies = n_distinct(edx$movieId), average_rating = round(mean(edx$rating),2), number_of_genres = n_distinct(edx$genres), the_first_rating_date = as.Date(as.POSIXct(min(edx$timestamp), origin = "1970-01-01")), the_last_rating_date = as.Date(as.POSIXct(max(edx$timestamp), origin = "1970-01-01")))
+
+edx_summary [1:6] %>% kable(caption = "Summary of edx set (part 1)") %>% kable_styling(font_size = 10, position = "center", latex_options = c("scale_down","HOLD_position"))
+
+edx_summary[7:8] %>% 
+  kable(caption = "Summary of edx set (part 2)") %>%
+    kable_styling(font_size = 10, position = "center",
+                  latex_options = "HOLD_position")
+
+validation_summary <- data.frame(number_of_rows = nrow(validation), number_of_column = ncol(validation), number_of_users = n_distinct(validation$userId), number_of_movies = n_distinct(validation$movieId), average_rating = mean(validation$rating), number_of_genres = n_distinct(validation$genres), the_first_rating_date = as.Date(as.POSIXct(min(validation$timestamp), origin = "1970-01-01")), the_last_rating_date = as.Date(as. POSIXct(max(validation$timestamp), origin = "1970-01-01")))
+
+#create summary table
+validation_summary[,1:6] %>% kable(caption = "Summary of validation set (part 1)", digits = 2) %>% kable_styling(font_size = 10, position = "center", latex_options = c("scale_down", "HOLD_position"))
+
+validation_summary[,7:8] %>%
+      kable(caption = "Summary of validation set (part 2)") %>% kable_styling(font_size = 10, position = "center", latex_options = "HOLD_position")
+
+#create a summary table grouping by rating
+rating_sum <- edx %>% group_by(rating) %>%   summarize(count = n())
+gg <- rating_sum %>% mutate(rating = factor(rating)) %>%
+  ggplot(aes(rating, count)) + geom_col(fill = "steel blue", color = "white") +
+  theme_classic() + labs(x = "Rating", y = "Count", title = "Number of rating",
+       caption = "Figure 1 - Rating in edx dataset")
+ggplotly(gg)
+
+gg <- rating_sum %>% 
+  mutate(rating = factor(rating),
+         top_rating = ifelse(rating %in% c(3,4,5),"high","low")) %>%
+  ggplot(aes(x = reorder(rating, count), count, fill = top_rating)) +
+  geom_col(color = "white") + coord_flip() + scale_fill_manual(values = c("steel blue","grey")) + theme_classic() + theme(legend.position = "none",
+        axis.title.x = element_text(size = 10), axis.title.y = element_text(size = 10),
+        plot.title = element_text(size = 12)) + labs(title = "Ranking most rating value",
+       x = "Rating", caption = "Figure 2 - Data source edx")
+ggplotly(gg)
+
+#create summary table grouping by movieId
+movie_sum <- edx %>% group_by(movieId) %>% summarize(n_rating_of_movie = n(), mu_movie = mean(rating), sd_movie = sd(rating))
+#create figure of number of rating
+gg <- movie_sum %>% ggplot(aes(n_rating_of_movie)) + geom_density(fill = "gold1") +
+  labs(title = "Density plot - number of rating", x = "number of rating", y = "density",
+       caption = "Figure 3 - The long tail number of rating") + geom_vline(aes(xintercept = mean(movie_sum$n_rating_of_movie)), color = "red")+ annotate("text", x = 2000, y = 0.0022, label = print(round(mean(movie_sum$n_rating_of_movie),0)), color = "red", size = 3) + theme_classic() + theme(axis.title.x = element_text(size = 10), axis.title.y = element_text(size = 10), plot.title = element_text(size = 12), legend.position = "none")
+ggplotly(gg)
+
+subplot (ggplotly(movie_sum %>% ggplot(aes(mu_movie)) + 
+  geom_histogram(fill = "steel blue", color = "black", binwidth = 0.5) +
+  labs(title = "Distribution of movie's average rating", x = "rating",
+       y = "count", caption = "Figure 5") + theme_classic() + theme(axis.title.x = element_text(size = 10), axis.title.y = element_text(size = 10), plot.title = element_text(size = 12))), ggplotly(rating_sum %>% ggplot(aes(x = rating, y = count)) +
+  geom_col(fill = "grey", color = "black") + labs(title = "Distribution of true rating",
+       x = "rating", y = "count", caption = "Figure 6") + theme_classic() +
+  theme(axis.title.x = element_text(size = 10), axis.title.y = element_text(size = 10),
+        plot.title = element_text(size = 12))), nrows = 1)
+
+#Code for plotting the standard deviation of ratings:
+gg <- movie_sum %>% mutate(group = cut(n_rating_of_movie, 
+                     breaks = c(-Inf, mean(n_rating_of_movie),Inf), 
+                     labels = c("n < 843", "n > 843"))) %>%
+  ggplot(aes(sd_movie, fill = group)) + geom_density(alpha = 0.5) +
+  labs(title = "Standard deviation of rating", x = "Standard deviation",
+       y = "count", caption = "Figure 7 - 
+       N < 843 number of rating less than average,
+       N > 843 number of rating greater than average") + 
+  theme_classic() + theme(axis.title.x = element_text(size = 10),
+        axis.title.y = element_text(size = 10), plot.title = element_text(size = 12))
+ggplotly(gg)
+
+#create summary table grouping by userId
+user_sum <- edx %>% group_by(userId) %>%
+  summarize(n_user_rated = n(), mu_user = mean(rating), sd_user = sd(rating))
+#create figure of number of rating
+gg <- user_sum %>% ggplot(aes(n_user_rated)) +
+  geom_density(fill = "steel blue", alpha = 0.8) +
+  labs(title = "Density plot - number of user rated",
+       x = "number of rating", y = "density", caption = "Figure 8") + 
+  geom_vline(aes(xintercept = mean(user_sum$n_user_rated)), color = "red")+
+  annotate("text", x = 400, y = 0.009,
+           label = print(round(mean(user_sum$n_user_rated),0)),
+           color = "red", size = 3) + theme_classic() +
+  theme(axis.title.x = element_text(size = 10), axis.title.y = element_text(size = 10),
+        plot.title = element_text(size = 12), legend.position = "none")
+ggplotly(gg)
+
+#top 10 users have highest number of rating
+user_sum %>% arrange(desc(n_user_rated)) %>% head(10) %>%
+   kable(caption = "Top 10 users with highest number of rating given",
+        digits = 2) %>% kable_styling(font_size = 10, position = "center",
+                  latex_options = "HOLD_position")
+
+#top 10 users have lowest number of rating
+user_sum %>% arrange(n_user_rated) %>% head(10) %>%
+  kable(caption = "Top 10 users with lowest number of rating given",
+        digits = 2) %>%  kable_styling(font_size = 10, position = "center",
+                  latex_options = "HOLD_position")
+
+
+gg <- user_sum %>%  ggplot(aes(n_user_rated, mu_user)) +
+  geom_point(color = "steel blue", alpha = 0.3) + geom_smooth() +
+  theme_classic() + labs(title = "Scatter plot - number of rating user given vs average rating",
+       x = "number of rating user given", y = "average rating",
+       caption = "Figure 9") + theme(axis.title.x = element_text(size = 10),
+        axis.title.y = element_text(size = 10), plot.title = element_text(size = 12),
+        legend.position = "none") 
+ggplotly(gg)
+
+#Code for plotting yearly average number of ratings:
+edx <- edx %>% mutate(rating_time = as.Date(as.POSIXct(timestamp, origin = "1970-01-01"))) %>% mutate(rating_year = year(rating_time))
+edx <- edx %>% mutate(release_year = as.integer(substr(title, str_length(title) - 4,                                           str_length(title) - 1)))
+release_year_sum <- edx %>% group_by(release_year) %>% summarize(n = n(), average_rating = mean(rating))
+subplot( ggplot(release_year_sum, aes(release_year, n)) +
+    geom_point(color = "steel blue", alpha = 0.6) + 
+geom_line(color = "steel blue") + theme_classic() +
+ labs(title = "number of movies by release year", caption = "Figure 11") + theme(axis.title.x = element_text(size = 10), 
+axis.title.y = element_text(size = 10),           
+plot.title = element_text(size = 12), legend.position = "none"), 
+release_year_sum %>% ggplot(aes(release_year, average_rating)) 
++ geom_point(color = "steel blue", alpha = 0.6) 
++ theme_classic() + geom_smooth() + labs(title = "average rating by release year",
+         caption = "Figure 12") + theme(axis.title.x = element_text(size = 10),           axis.title.y = element_text(size = 10), 
+plot.title = element_text(size = 12),
+          legend.position = "none"), nrows = 1)
+
+#calculate the first rating time of each movie
+movie_sum <- edx %>% group_by(movieId) %>%
+  summarize(n_rating_of_movie = n(), mu_movie = mean(rating),
+            first_rating_time = min(timestamp))
+
+#calculate the aging time
+edx <- edx %>% left_join(movie_sum, by = "movieId")
+edx <- edx %>% mutate(aging_time = round((timestamp - first_rating_time)/60/60/24/30,0))
+
+#create a summary table grouping by aging time
+aging_time_sum <- edx %>% group_by(aging_time) %>%
+  summarize(n_aging_time = n(), average_rating = mean(rating))
+#visualize by ggplot
+subplot(ggplot(aging_time_sum, aes(aging_time, n_aging_time)) +
+               geom_point(color = "steel blue") + geom_line(color = "steel blue") +
+               theme_classic() + labs(title = "number of rating per aging time",
+                    x = "aging time (month)", y = "count",  caption = "Figure 13") + theme(axis.title.x = element_text(size = 10), axis.title.y = element_text(size = 10), plot.title = element_text(size = 12), legend.position = "none"),
+              ggplot(aging_time_sum, aes(aging_time, average_rating)) +
+               geom_point(color = "steel blue") + geom_line(color = "steel blue") +
+               theme_classic() + labs(title = "average rating per aging time",
+                    x = "aging time (month)", y = "average rating",
+                    caption = "Figure 14") + theme(axis.title.x = element_text(size = 10),
+        axis.title.y = element_text(size = 10), plot.title = element_text(size = 12),
+        legend.position = "none"),    nrows = 2)
