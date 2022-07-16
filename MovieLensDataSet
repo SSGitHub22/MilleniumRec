@@ -1,8 +1,10 @@
 ##########################################################
-# Create edx set, validation set (final hold-out test set)
+# Movie Lens recommendation system
+# Date : 16/07/2022
+# Machine learning algorithm to generate predicted movies 
 ##########################################################
 
-# Note: this process could take a couple of minutes
+# First step involves downloading all the required libraries and the data sets edx MovieLens and Validation data set. 
 
 if(!require(tidyverse)) install.packages("tidyverse", repos = "http://cran.us.r-project.org")
 if(!require(caret)) install.packages("caret", repos = "http://cran.us.r-project.org")
